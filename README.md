@@ -19,58 +19,144 @@ Production-style prototype: a Gradio chat UI backed by **OpenAI gpt-4o-mini** an
 - **Orders** — place orders and view history through MCP.
 - **Resilient behavior** — OpenAI and MCP failures surface as short, user-friendly messages (no stack traces in the UI).
 
-## Local setup
+---
 
-1. **Clone or copy** this `meridian-chatbot` folder.
+## Step-by-step: Run the project locally
 
-2. **Create a virtual environment** (recommended):
+### 1. Clone the repository
+
+**Git (HTTPS):**
+
+```bash
+git clone https://github.com/SilasAmisi/meridian-chatbot.git
+cd meridian-chatbot
+```
+
+If you use SSH, replace the URL with your SSH remote. On Windows, the same commands work in **PowerShell**, **Command Prompt**, or **Git Bash**.
+
+### 2. Install requirements
+
+Create and activate a virtual environment (recommended), then install dependencies:
+
+**Windows (PowerShell):**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Use **Python 3.10+**.
+
+### 3. Add `.env` locally
+
+Copy the example env file and fill in your OpenAI key:
+
+**Windows:**
+
+```powershell
+copy .env.example .env
+```
+
+**macOS / Linux:**
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` in your editor and set:
+
+```env
+OPENAI_API_KEY=sk-...your-real-key...
+```
+
+Do **not** commit `.env` — it is listed in `.gitignore`.
+
+### 4. Run locally with `python app.py`
+
+From the `meridian-chatbot` directory (with the virtual environment activated):
+
+```bash
+python app.py
+```
+
+Open the URL Gradio prints (typically **http://127.0.0.1:7860**). The app listens on `0.0.0.0` and port **7860** (or the `PORT` environment variable), which matches Hugging Face Spaces.
+
+---
+
+## Step-by-step: Hugging Face Space
+
+### 5. Create a Hugging Face Space
+
+1. Sign in at [huggingface.co](https://huggingface.co).
+2. Click your avatar → **New Space** (or go to [huggingface.co/new-space](https://huggingface.co/new-space)).
+3. Choose a **Space name** (for example `meridian-chatbot`) and owner (**User** or **Organization**).
+4. Set **SDK** to **Gradio** (this project uses `app.py` as the entry file).
+5. Choose visibility (**Public** or **Private**) and hardware if needed, then **Create Space**.
+
+You will get a Space URL like:
+
+`https://huggingface.co/spaces/<your-username>/<your-space-name>`
+
+Remember **`<your-username>/<your-space-name>`** — you need it for git remotes and for GitHub Actions (as `HF_SPACE_REPO`).
+
+### 6. Add `OPENAI_API_KEY` as a Space secret
+
+1. Open your Space on Hugging Face.
+2. Go to **Settings** (tab on the Space page).
+3. Open **Repository secrets** (or **Variables and secrets** → secrets for the Space).
+4. Add a new secret:
+   - **Name:** `OPENAI_API_KEY`
+   - **Value:** your OpenAI API key (`sk-...`).
+
+Save. The Space injects this as an environment variable at runtime, which `chatbot.py` reads via `os.environ` (and `python-dotenv` is optional on Spaces).
+
+### 7. Push to Hugging Face to trigger deployment
+
+The Space runs from the **Git repository** hosted on Hugging Face. Any push to that repo’s default branch (**`main`**) starts a new build and deployment.
+
+**Option A — Push from your computer (first-time or manual deploy)**
+
+1. Install the Hugging Face CLI (once): `pip install huggingface_hub`
+2. Log in: `huggingface-cli login` (paste a **write** token from [Settings → Access Tokens](https://huggingface.co/settings/tokens)).
+3. In your local `meridian-chatbot` clone, add the Space as a remote (replace `YOUR_USER` and `YOUR_SPACE`):
 
    ```bash
-   python -m venv .venv
-   .venv\Scripts\activate
+   git remote add huggingface https://huggingface.co/spaces/YOUR_USER/YOUR_SPACE.git
    ```
 
-3. **Install dependencies**:
+4. Push your `main` branch:
 
    ```bash
-   pip install -r requirements.txt
+   git push huggingface main
    ```
 
-4. **Configure environment variables** — copy the example file and add your key:
+If the Space already had an initial commit from the web UI, you may need **`git push --force huggingface main`** once to replace it with this repo — only do that if you are sure you will not lose wanted changes on the Space.
 
-   ```bash
-   copy .env.example .env
-   ```
+**Option B — Push to GitHub `main` to auto-deploy (recommended)**
 
-   Edit `.env` and set `OPENAI_API_KEY` to your OpenAI API key. Do not commit `.env` (it is listed in `.gitignore`).
+This repository includes [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). On every push to **`main`**, GitHub Actions logs into Hugging Face and **force-pushes** the same commit to your Space so the Space stays in sync with GitHub.
 
-5. **Run the app**:
+1. In your **GitHub** repository: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+2. Add **`HF_TOKEN`**: a Hugging Face [access token](https://huggingface.co/settings/tokens) with **write** permission (role **write** is enough to push to Spaces you own).
+3. Add **`HF_SPACE_REPO`**: the Space id in the form **`username/space-name`** (example: `swawire/meridian-chatbot`). No `https://`, no `spaces/` prefix — only `owner/repo-style-name` as shown in the Space URL path after `/spaces/`.
+4. Push (or merge) to **`main`** on GitHub. Open the **Actions** tab to confirm the **Deploy to Hugging Face Space** workflow succeeded.
 
-   ```bash
-   python app.py
-   ```
+If either secret is missing, the workflow fails with an error pointing you back to this README.
 
-   Open the URL shown in the terminal (by default Gradio listens on `http://127.0.0.1:7860`). The server binds to `0.0.0.0` and port `7860` (or the `PORT` environment variable if set), which matches Hugging Face Spaces.
-
-## Deploying to Hugging Face Spaces
-
-1. Create a **new Space** with SDK **Gradio** and hardware as needed.
-
-2. Upload this project (or connect a Git repository) so the Space root contains `app.py`, `chatbot.py`, `mcp_client.py`, `requirements.txt`, and `README.md`.
-
-3. In the Space **Settings → Repository secrets**, add:
-
-   - `OPENAI_API_KEY` — your OpenAI API key (required).
-
-   Spaces inject secrets as environment variables; `python-dotenv` in `app.py` / `chatbot.py` also loads a `.env` file if you use one locally, but on Spaces you typically rely on secrets only.
-
-4. **Push** your code. The Space runs `python app.py` automatically when `app.py` is the entry file.
-
-Ensure `requirements.txt` matches the Space runtime (Python 3.10+ recommended).
+---
 
 ## Tests
 
-From this directory, with dependencies installed:
+From the `meridian-chatbot` directory, with dependencies installed:
 
 ```bash
 python -m pytest tests/ -v
@@ -80,16 +166,17 @@ python -m pytest tests/ -v
 
 ## Project layout
 
-| File | Role |
+| Path | Role |
 |------|------|
 | `app.py` | Gradio `ChatInterface`, launch on `0.0.0.0`, auth `gr.State` |
 | `chatbot.py` | System prompt, OpenAI loop, MCP tool execution |
 | `mcp_client.py` | Official `mcp` SDK, Streamable HTTP transport |
+| `.github/workflows/deploy.yml` | On push to `main`, syncs repo to Hugging Face Space |
 | `tests/` | Pytest: MCP connectivity, tool discovery, chatbot reply shape |
 | `.env.example` | Template for `OPENAI_API_KEY` |
 | `requirements.txt` | Python dependencies |
 
-The default MCP URL is in `mcp_client.py` (same hosted Meridian order server). Override with environment variable `MCP_SERVER_URL` if needed. Tools are discovered at runtime — tool names are not hardcoded for discovery.
+The default MCP URL is in `mcp_client.py`. Override with **`MCP_SERVER_URL`** in `.env` if needed. Tools are discovered at runtime — tool names are not hardcoded for discovery.
 
 ## License
 

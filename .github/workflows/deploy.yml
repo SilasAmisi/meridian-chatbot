@@ -1,0 +1,47 @@
+# Syncs the default branch to a Hugging Face Space whenever `main` is updated.
+# Configure repository secrets: HF_TOKEN, HF_SPACE_REPO (see README).
+
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: huggingface-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  push-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HF_TOKEN:-}" ] || [ -z "${HF_SPACE_REPO:-}" ]; then
+            echo "::error::Missing GitHub Actions secrets. Add HF_TOKEN and HF_SPACE_REPO — see README \"Automatic deployment from GitHub\"."
+            exit 1
+          fi
+          pip install --quiet "huggingface_hub>=0.20.0"
+          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential
+          SPACE_URL="https://huggingface.co/spaces/${HF_SPACE_REPO}.git"
+          git remote remove space 2>/dev/null || true
+          git remote add space "$SPACE_URL"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git push --force space HEAD:main
