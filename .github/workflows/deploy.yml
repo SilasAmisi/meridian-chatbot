@@ -1,3 +1,6 @@
+# Deploy = checkout + git push only. Do NOT add actions/setup-python here — it is unnecessary
+# for git and can interact with HF-related tools on ubuntu-latest.
+
 name: Deploy to Hugging Face Space
 
 on:
@@ -27,12 +30,17 @@ jobs:
           HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
         run: |
           set -euo pipefail
+          # Skip system gitconfig (often registers a huggingface.co credential helper → huggingface-cli).
+          export GIT_CONFIG_NOSYSTEM=1
+          export GCM_INTERACTIVE=never
           HF_USERNAME=$(echo "$HF_SPACE_REPO" | cut -d'/' -f1)
+          if [ -z "$HF_USERNAME" ] || [ "$HF_USERNAME" = "$HF_SPACE_REPO" ]; then
+            echo "::error::HF_SPACE_REPO must be owner/space-name (e.g. swawire/meridian-chatbot)."
+            exit 1
+          fi
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
           git remote remove space 2>/dev/null || true
           git remote add space https://$${HF_USERNAME}:$${HF_TOKEN}@huggingface.co/spaces/$${HF_SPACE_REPO}.git
-          # Token is already in the remote URL — disable credential helpers so Git does not
-          # invoke huggingface-cli/hf (preinstalled on ubuntu-latest) when talking to huggingface.co.
           unset GIT_ASKPASS || true
           GIT_TERMINAL_PROMPT=0 git -c credential.helper= push --force space HEAD:main 2>&1
