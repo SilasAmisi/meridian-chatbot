@@ -6,6 +6,7 @@ colorTo: blue
 sdk: gradio
 app_file: app.py
 pinned: false
+license: mit
 ---
 
 # Meridian Electronics — Customer Support Chatbot
@@ -187,13 +188,23 @@ python -m pytest tests/ -v
 | `app.py` | Gradio `ChatInterface`, launch on `0.0.0.0`, auth `gr.State` |
 | `chatbot.py` | System prompt, OpenAI loop, MCP tool execution |
 | `mcp_client.py` | Official `mcp` SDK, Streamable HTTP transport |
-| `.github/workflows/deploy.yml` | On push to `main`, syncs repo to Hugging Face Space |
+| `.github/workflows/deploy.yml` | Deploy to Hugging Face Space (`permissions: contents: read`) |
+| `.github/dependabot.yml` | Weekly pip + monthly GitHub Actions dependency updates |
 | `tests/` | Pytest: MCP connectivity, tool discovery, chatbot reply shape |
-| `.env.example` | Template for `OPENAI_API_KEY` |
+| `.env.example` | Template for `OPENAI_API_KEY` (never commit real `.env`) |
 | `requirements.txt` | Python dependencies |
+| `SECURITY.md` | Vulnerability reporting and secret-handling expectations |
+| `CONTRIBUTING.md` | How to contribute and run tests |
+| `LICENSE` | MIT |
 
 The default MCP URL is in `mcp_client.py`. Override with **`MCP_SERVER_URL`** in `.env` if needed. Tools are discovered at runtime — tool names are not hardcoded for discovery.
 
+## Security
+
+- **Secrets:** Keep `OPENAI_API_KEY` and any Hugging Face tokens in **`.env` locally** (gitignored) and in **GitHub / Hugging Face secret stores** for CI and Spaces — never in source or issues.
+- **Workflow:** The deploy workflow uses **least-privilege** `permissions: contents: read`; Hugging Face push auth uses **`HF_TOKEN`** / **`HF_SPACE_REPO`** repository secrets only.
+- **Reporting:** See **[SECURITY.md](SECURITY.md)** for how to report vulnerabilities responsibly.
+
 ## License
 
-Use and modify for your Meridian Electronics prototype as needed.
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Meridian Electronics (prototype).

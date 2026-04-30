@@ -8,6 +8,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Least privilege: this job only reads the repo; push to Hugging Face uses HF_TOKEN, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
