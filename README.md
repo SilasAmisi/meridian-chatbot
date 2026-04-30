@@ -143,7 +143,7 @@ If the Space already had an initial commit from the web UI, you may need **`git 
 
 **Option B — Push to GitHub `main` to auto-deploy (recommended)**
 
-This repository includes [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). On every push to **`main`**, GitHub Actions logs into Hugging Face and **force-pushes** the same commit to your Space so the Space stays in sync with GitHub.
+This repository includes [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). On every push to **`main`**, GitHub Actions **force-pushes** to your Space over HTTPS using **`HF_TOKEN`** (no `pip install huggingface_hub` / `hf` in CI, so the deprecated `huggingface-cli` shim is never invoked).
 
 1. In your **GitHub** repository: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
 2. Add **`HF_TOKEN`**: a Hugging Face [access token](https://huggingface.co/settings/tokens) with **write** permission (role **write** is enough to push to Spaces you own).

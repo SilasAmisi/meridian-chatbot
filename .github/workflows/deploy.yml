@@ -1,5 +1,6 @@
 # Syncs the default branch to a Hugging Face Space whenever `main` is updated.
-# Configure repository secrets: HF_TOKEN, HF_SPACE_REPO (see README).
+# Secrets: HF_TOKEN (write token), HF_SPACE_REPO (e.g. your-user/your-space).
+# Uses HTTPS git push with embedded credentials — no huggingface-cli / hf in CI.
 
 name: Deploy to Hugging Face Space
 
@@ -22,11 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -34,12 +30,15 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${HF_TOKEN:-}" ] || [ -z "${HF_SPACE_REPO:-}" ]; then
-            echo "::error::Missing GitHub Actions secrets. Add HF_TOKEN and HF_SPACE_REPO — see README \"Automatic deployment from GitHub\"."
+            echo "::error::Missing GitHub Actions secrets. Add HF_TOKEN and HF_SPACE_REPO — see README."
             exit 1
           fi
-          pip install --quiet "huggingface_hub>=0.26.0"
-          hf auth login --token "$HF_TOKEN" --add-to-git-credential
-          SPACE_URL="https://huggingface.co/spaces/${HF_SPACE_REPO}.git"
+          HF_USER="${HF_SPACE_REPO%%/*}"
+          if [ -z "$HF_USER" ] || [ "$HF_USER" = "$HF_SPACE_REPO" ]; then
+            echo "::error::HF_SPACE_REPO must be owner/space-name (example: swawire/meridian-chatbot)."
+            exit 1
+          fi
+          SPACE_URL="https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REPO}.git"
           git remote remove space 2>/dev/null || true
           git remote add space "$SPACE_URL"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
