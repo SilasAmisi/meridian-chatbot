@@ -1,3 +1,13 @@
+---
+title: Meridian Electronics — Customer Support
+emoji: 🏬
+colorFrom: gray
+colorTo: blue
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # Meridian Electronics — Customer Support Chatbot
 
 Production-style prototype: a Gradio chat UI backed by **OpenAI gpt-4o-mini** and a **remote MCP server** (Streamable HTTP). All product, order, and authentication operations go through MCP tools — the app does not talk to a database directly.
