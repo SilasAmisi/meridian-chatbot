@@ -37,8 +37,8 @@ jobs:
             echo "::error::Missing GitHub Actions secrets. Add HF_TOKEN and HF_SPACE_REPO — see README \"Automatic deployment from GitHub\"."
             exit 1
           fi
-          pip install --quiet "huggingface_hub>=0.20.0"
-          huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential
+          pip install --quiet "huggingface_hub>=0.26.0"
+          hf auth login --token "$HF_TOKEN" --add-to-git-credential
           SPACE_URL="https://huggingface.co/spaces/${HF_SPACE_REPO}.git"
           git remote remove space 2>/dev/null || true
           git remote add space "$SPACE_URL"

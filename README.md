@@ -126,7 +126,7 @@ The Space runs from the **Git repository** hosted on Hugging Face. Any push to t
 **Option A — Push from your computer (first-time or manual deploy)**
 
 1. Install the Hugging Face CLI (once): `pip install huggingface_hub`
-2. Log in: `huggingface-cli login` (paste a **write** token from [Settings → Access Tokens](https://huggingface.co/settings/tokens)).
+2. Log in: `hf auth login` (paste a **write** token from [Settings → Access Tokens](https://huggingface.co/settings/tokens)), or non-interactive: `hf auth login --token YOUR_TOKEN --add-to-git-credential`.
 3. In your local `meridian-chatbot` clone, add the Space as a remote (replace `YOUR_USER` and `YOUR_SPACE`):
 
    ```bash
