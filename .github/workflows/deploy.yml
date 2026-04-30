@@ -1,5 +1,5 @@
-# Deploy = checkout + git push only. Do NOT add actions/setup-python here — it is unnecessary
-# for git and can interact with HF-related tools on ubuntu-latest.
+# Deploy = checkout + validate + git push. Do NOT add actions/setup-python — it can trigger
+# huggingface-cli via credential helpers on ubuntu-latest.
 
 name: Deploy to Hugging Face Space
 
@@ -18,11 +18,48 @@ concurrency:
 jobs:
   push-to-hub:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Avoid login profiles that might run extra tooling on shell startup.
+        shell: bash --noprofile --norc {0}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Validate Hugging Face secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
+        run: |
+          set -euo pipefail
+          echo "::group::Checking secrets (values are hidden)"
+          if [ -z "${HF_TOKEN:-}" ]; then
+            echo "::error::Secret HF_TOKEN is empty or not set. GitHub → Settings → Secrets and variables → Actions → add repository secret HF_TOKEN (Hugging Face write token)."
+            exit 1
+          fi
+          if [ -z "${HF_SPACE_REPO:-}" ]; then
+            echo "::error::Secret HF_SPACE_REPO is empty or not set. Add repository secret HF_SPACE_REPO as owner/space-name (example: myuser/my-space)."
+            exit 1
+          fi
+          if echo "$HF_SPACE_REPO" | grep -qE '^https?://'; then
+            echo "::error::HF_SPACE_REPO must not be a full URL. Use only owner/space-name (e.g. myuser/my-space), not https://huggingface.co/spaces/..."
+            exit 1
+          fi
+          if ! echo "$HF_SPACE_REPO" | grep -q '/'; then
+            echo "::error::HF_SPACE_REPO must contain a slash: owner/space-name."
+            exit 1
+          fi
+          HF_OWNER=$(echo "$HF_SPACE_REPO" | cut -d'/' -f1)
+          HF_SPACE=$(echo "$HF_SPACE_REPO" | cut -d'/' -f2-)
+          if [ -z "$HF_OWNER" ] || [ -z "$HF_SPACE" ] || [ "$HF_OWNER" = "$HF_SPACE_REPO" ]; then
+            echo "::error::Could not parse owner and space from HF_SPACE_REPO."
+            exit 1
+          fi
+          echo "HF_SPACE_REPO format OK (owner length: ${#HF_OWNER}, rest is space name)."
+          echo "::endgroup::"
 
       - name: Push to Hugging Face Space
         env:
@@ -30,17 +67,43 @@ jobs:
           HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
         run: |
           set -euo pipefail
-          # Skip system gitconfig (often registers a huggingface.co credential helper → huggingface-cli).
           export GIT_CONFIG_NOSYSTEM=1
           export GCM_INTERACTIVE=never
+          unset GIT_ASKPASS || true
+
           HF_USERNAME=$(echo "$HF_SPACE_REPO" | cut -d'/' -f1)
-          if [ -z "$HF_USERNAME" ] || [ "$HF_USERNAME" = "$HF_SPACE_REPO" ]; then
-            echo "::error::HF_SPACE_REPO must be owner/space-name (e.g. swawire/meridian-chatbot)."
+          REMOTE_URL="https://$${HF_USERNAME}:$${HF_TOKEN}@huggingface.co/spaces/$${HF_SPACE_REPO}.git"
+
+          echo "::group::Pre-flight: can we reach the Space over HTTPS?"
+          if ! GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote "$REMOTE_URL" HEAD >/dev/null 2>"$RUNNER_TEMP/hf_ls_remote.err"; then
+            echo "::error::git ls-remote failed — usually wrong HF_SPACE_REPO, expired HF_TOKEN, or token without write access to this Space."
+            echo "::error::Confirm owner/space at https://huggingface.co/spaces/ — token user must own or have write to that Space. Re-run after fixing secrets."
             exit 1
           fi
+          echo "ls-remote OK."
+          echo "::endgroup::"
+
+          echo "::group::Configure git and push"
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
           git remote remove space 2>/dev/null || true
-          git remote add space https://$${HF_USERNAME}:$${HF_TOKEN}@huggingface.co/spaces/$${HF_SPACE_REPO}.git
-          unset GIT_ASKPASS || true
-          GIT_TERMINAL_PROMPT=0 git -c credential.helper= push --force space HEAD:main 2>&1
+          git remote add space "$REMOTE_URL"
+          if ! GIT_TERMINAL_PROMPT=0 git -c credential.helper= push --force space HEAD:main 2>&1; then
+            echo "::error::git push failed after ls-remote succeeded. Try re-run; if it persists, check Space settings and token scope."
+            exit 1
+          fi
+          echo "Push OK."
+          echo "::endgroup::"
+
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          echo "::group::Deploy failure — checklist (read in order)"
+          echo "1. Secrets must be **repository** secrets (Settings → Secrets and variables → Actions), named exactly HF_TOKEN and HF_SPACE_REPO, unless you use Environments."
+          echo "2. HF_SPACE_REPO = owner/space only (from https://huggingface.co/spaces/OWNER/SPACE → use OWNER/SPACE)."
+          echo "3. HF_TOKEN = Hugging Face access token with **Write**; the token’s user must **own** that Space (or have write access)."
+          echo "4. Do **not** add actions/setup-python to this workflow — it can pull in huggingface-cli on git operations."
+          echo "5. If you saw huggingface-cli / pip warnings: system Git credential helper — this workflow sets GIT_CONFIG_NOSYSTEM=1 and empty credential.helper on git calls."
+          echo "6. Re-run the job after fixing secrets (no new commit required)."
+          echo "::endgroup::"
+          git --version

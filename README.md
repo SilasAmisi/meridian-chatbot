@@ -154,6 +154,20 @@ This repository includes [`.github/workflows/deploy.yml`](.github/workflows/depl
 
 If either secret is missing, the workflow fails with an error pointing you back to this README.
 
+### Troubleshooting: deploy workflow fails
+
+The workflow **validates secrets**, runs **`git ls-remote`** (auth check), then **`git push`**. In the Actions log, expand the groups **“Checking secrets”**, **“Pre-flight”**, and **“Configure git and push”** to see which step failed.
+
+| Symptom | What to check |
+|--------|----------------|
+| **HF_TOKEN is empty or not set** | Add a **repository** secret named `HF_TOKEN` under **Settings → Secrets and variables → Actions** (not only Environment secrets, unless the job targets that environment). |
+| **HF_SPACE_REPO wrong format** | Must be `owner/space` only — no `https://`, no leading `spaces/`. Copy from the Space URL: `https://huggingface.co/spaces/OWNER/SPACE` → use `OWNER/SPACE`. |
+| **`git ls-remote` failed** | Token lacks **write** access, wrong Space name, Space deleted, or token owner ≠ Space owner. Create a new [HF token](https://huggingface.co/settings/tokens) with **Write** and try again. |
+| **`git push` failed after ls-remote OK** | Rare (permissions changed mid-run, or branch protection on the Space side). Re-run the job; confirm the Space still exists. |
+| **`huggingface-cli` / pip in the log** | Remove any **`actions/setup-python`** step from this workflow. The template job is **only** checkout + shell steps. |
+
+After changing secrets, use **Re-run failed jobs** — no new commit is required.
+
 ---
 
 ## Tests
