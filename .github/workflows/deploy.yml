@@ -26,7 +26,9 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
         run: |
+          set -euo pipefail
+          HF_USERNAME=$(echo "$HF_SPACE_REPO" | cut -d'/' -f1)
           git config user.email "ci@github.com"
           git config user.name "GitHub Actions"
-          git remote add space https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REPO}.git
-          git push --force space HEAD:main
+          git remote add space https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_REPO}.git
+          GIT_TERMINAL_PROMPT=0 git push --force space HEAD:main 2>&1
